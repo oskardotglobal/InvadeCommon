@@ -1,9 +1,10 @@
 package berlin.ong.student.invadeclient
 
+import com.ditchoom.websocket.WebSocketClient
+import com.ditchoom.websocket.WebSocketConnectionOptions
+import com.ditchoom.websocket.WebSocketMessage
+import com.ditchoom.websocket.allocate
 import com.jme3.math.Vector3f
-import io.ktor.client.*
-import io.ktor.client.features.websocket.*
-import io.ktor.http.cio.websocket.*
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
@@ -15,10 +16,14 @@ import kotlinx.coroutines.launch
  * @see InvadeControllerReceiver.Listener
  * @see listen
  */
-class InvadeControllerReceiver(private val url: String) {
-    private val client = HttpClient {
-        install(WebSockets)
-    }
+class InvadeControllerReceiver(host: String, port: Int, path: String) {
+    private val client = WebSocketClient.Companion.allocate(
+        WebSocketConnectionOptions(
+            name = host,
+            port = port,
+            websocketEndpoint = path,
+        )
+    )
 
     /**
      * Start listening for rotation updates.
@@ -30,22 +35,24 @@ class InvadeControllerReceiver(private val url: String) {
     @OptIn(DelicateCoroutinesApi::class)
     fun listen(listener: Listener) {
         GlobalScope.launch {
-            client.ws(url) {
+            client.connect()
+
+            client.onIncomingWebsocketMessage onMessage@{ message ->
+                if (message !is WebSocketMessage.Text) return@onMessage
+
+                println("connect")
+
                 try {
-                    for (message in incoming) {
-                        if (message !is Frame.Text) continue
+                    val floats = message.value
+                        .split(";")
+                        .map { v -> v.toFloat() }
 
-                        val floats = message.readText()
-                            .split(";")
-                            .map { v -> v.toFloat() }
+                    assert(floats.size == 3)
 
-                        assert(floats.size == 3)
-
-                        val vec = Vector3f(floats[0], floats[1], floats[2])
-                        listener.onRotationChange(vec)
-                    }
-                } catch (e: Exception) {
-                    listener.onError()
+                    val vec = Vector3f(floats[0], floats[1], floats[2])
+                    listener.onRotationChange(vec)
+                } catch (_: Exception) {
+                    return@onMessage
                 }
             }
         }
@@ -54,8 +61,9 @@ class InvadeControllerReceiver(private val url: String) {
     /**
      * Disconnect the client, updates will no longer be sent.
      */
+    @OptIn(DelicateCoroutinesApi::class)
     fun disconnect() {
-        client.close()
+        GlobalScope.launch { client.close() }
     }
 
     interface Listener {

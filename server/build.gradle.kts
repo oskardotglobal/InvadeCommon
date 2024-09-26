@@ -10,11 +10,11 @@ plugins {
     kotlin("jvm") version "2.0.20"
 }
 
-group = "berlin.ong.student"
+group = "berlin.ong.student.invadeserver"
 version = "0.0.1"
 
 application {
-    mainClass.set("berlin.ong.student.ApplicationKt")
+    mainClass.set("berlin.ong.student.invadeserver.ApplicationKt")
 
     val isDevelopment: Boolean = project.ext.has("development")
     applicationDefaultJvmArgs = listOf("-Dio.ktor.development=$isDevelopment")
